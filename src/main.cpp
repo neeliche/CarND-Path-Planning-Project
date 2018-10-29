@@ -206,16 +206,14 @@ int main() {
         map_waypoints_dy.push_back(d_y);
     }
 
-    
+    //Mention the starting lane
+    int lane = 1;
 
-    h.onMessage([&map_waypoints_x, &map_waypoints_y, &map_waypoints_s, &map_waypoints_dx, &map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+    //Specifying the max velocity
+    double ref_vel = 0.5; //mph
+
+    h.onMessage([&map_waypoints_x, &map_waypoints_y, &map_waypoints_s, &map_waypoints_dx, &map_waypoints_dy, &lane, &ref_vel](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
             uWS::OpCode opCode) {
-        
-        //Mention the starting lane
-        int lane = 1;
-
-        //Specifying the max velocity
-        double ref_vel = 49.5; //mph
         
         // "42" at the start of the message means there's a websocket message event.
         // The 4 signifies a websocket message
@@ -262,6 +260,42 @@ int main() {
 
 
                     // TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
+                    
+                    if(prev_size > 0) {
+                        car_s = end_path_s;
+                    }
+                    
+                    bool too_close = false;
+                    
+                    for(int i = 0; i < sensor_fusion.size(); i++ ) {
+                        //check car is in my lane or not
+                        float d = sensor_fusion[i][6];
+                        
+                        // Each lane is designed to be 4m wide
+                        if(d < (2+4*lane+2) && d > (2+4*lane-2)) {
+                            
+                            //Since it is in my lane, going to check the speed of the car in front of me.
+                            double vx = sensor_fusion[i][3];
+                            double vy = sensor_fusion[i][4];
+                            double calc_speed = sqrt(pow(vx, 2.0) + pow(vy, 2.0));
+                            double car_sense_s = sensor_fusion[i][5]; //car's s position in frenet coordinates
+                            
+                            car_sense_s += ((double)prev_size*0.02*calc_speed);
+                            
+                            //Calculate the s gap between the car ahead and me
+                            if((car_sense_s > car_s) && (car_sense_s - car_s < 30)) {
+                                too_close = true;
+                            }
+                        }
+                    }
+                    
+                    if(too_close) {
+                        ref_vel -= 0.224;
+                    }else if (ref_vel < 49.5) {
+                        ref_vel += 0.224;
+                    }
+                    
+                    
 
                     vector<double> ptsx;
                     vector<double> ptsy;
