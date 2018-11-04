@@ -266,32 +266,66 @@ int main() {
                     }
                     
                     bool too_close = false;
+                    bool lane_change_left = false;  //Initiating to stay in line
+                    bool lane_change_right = false; //Initiating to stay in line
                     
+                    //TODO: Move these values to a constants file
+                    double safety_distance_front = 30; //Borrowing value from video
+                    double safety_distance_rear = 10; 
+                    
+                    if(lane < 2) lane_change_right = true;
+                    if(lane > 0) lane_change_left = true;
+                    
+                    //Checking all the cars we can sense
                     for(int i = 0; i < sensor_fusion.size(); i++ ) {
-                        //check car is in my lane or not
-                        float d = sensor_fusion[i][6];
                         
-                        // Each lane is designed to be 4m wide
-                        if(d < (2+4*lane+2) && d > (2+4*lane-2)) {
+                        //Extract values for sensed vehicle
+                        double vx = sensor_fusion[i][3];
+                        double vy = sensor_fusion[i][4];
+                        double calc_speed = sqrt(pow(vx, 2.0) + pow(vy, 2.0));
+                        double car_sense_s = sensor_fusion[i][5]; //car's s position in frenet coordinates
                             
-                            //Since it is in my lane, going to check the speed of the car in front of me.
-                            double vx = sensor_fusion[i][3];
-                            double vy = sensor_fusion[i][4];
-                            double calc_speed = sqrt(pow(vx, 2.0) + pow(vy, 2.0));
-                            double car_sense_s = sensor_fusion[i][5]; //car's s position in frenet coordinates
+                        //Crude way of "predicting" where the car would be
+                        car_sense_s += ((double)prev_size*0.02*calc_speed);
+                        
+                        
+                        //to check car is in my lane or not
+                        float d = sensor_fusion[i][6];
+
+                        //Determine if either the car in front is too close or if the one in the back is too close. 
+                        if (((car_sense_s > car_s) && (car_sense_s - car_s < safety_distance_front))
+                                or (car_sense_s - car_s < -safety_distance_rear)) {
+                            //too_close = true;
                             
-                            car_sense_s += ((double)prev_size*0.02*calc_speed);
-                            
-                            //Calculate the s gap between the car ahead and me
-                            if((car_sense_s > car_s) && (car_sense_s - car_s < 30)) {
+                            if(d < (2+4*lane+2) && d > (2+4*lane-2) && (car_sense_s > car_s)) {
+//                            if(floor(d/4.0) == lane && (car_sense_s > car_s)) {
+                                //In the same lane as Ego. 
                                 too_close = true;
+                                
+//                                if(lane < 2) lane_change_right = true;
+//                                if(lane > 0) lane_change_left = true;
+                            } else if (d > 0 && d < (2+4*lane-2)) {
+                                //Sensed a car close in left lane
+                                lane_change_left = false;
+                            } else if (d > (2+4*lane+2)) {
+                                //Sensed a car close in right lane
+                                lane_change_right = false;
                             }
                         }
                     }
                     
-                    if(too_close) {
+                    //Crude mechanism right now. Would prefer to figure out a way to pull the vehicle back to c
+                    //center lane.
+                    if (too_close) {
                         ref_vel -= 0.224;
-                    }else if (ref_vel < 49.5) {
+
+                        //Preferring left lane over right to overtake.
+                        if (lane_change_left) {
+                            lane--;
+                        } else if (lane_change_right) {
+                            lane++;
+                        }
+                    } else if (ref_vel < 49.5) {
                         ref_vel += 0.224;
                     }
                     
