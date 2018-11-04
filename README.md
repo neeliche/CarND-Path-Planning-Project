@@ -1,6 +1,6 @@
 # CarND-Path-Planning-Project
 Self-Driving Car Engineer Nanodegree Program
-   
+
 ### Simulator.
 You can download the Term3 Simulator which contains the Path Planning Project from the [releases tab (https://github.com/udacity/self-driving-car-sim/releases/tag/T3_v1.2).
 
@@ -11,6 +11,41 @@ In this project your goal is to safely navigate around a virtual highway with ot
 Each waypoint in the list contains  [x,y,s,dx,dy] values. x and y are the waypoint's map coordinate position, the s value is the distance along the road to get to that waypoint in meters, the dx and dy values define the unit normal vector pointing outward of the highway loop.
 
 The highway's waypoints loop around so the frenet s value, distance along the road, goes from 0 to 6945.554.
+
+## Reflection
+
+While building the algorithm, I could see how a more comprehensive system where I weigh in a better cost function can help with better determination of which lane is better to move to. In such cases, I would prefer the vehicle to move to the left lane only to overtake and then return back to the center lane.
+
+While the vehicle is able to cover more than 6.89 miles easily, certain edge cases, such as a swerving vehicle or a vehicle in front brakes suddenly, are not quite handled correctly. There is a cost function that needs to be created where sudden brakes in order to avoid collision with the vehicle in front maybe a better solution, but it may cause the vehicle behind us to bump into us. This is when the vehicle may be better off switching to another lane even though there is a vehicle in it withing the `safety_distance_front` that we set.
+
+There are several core improvements that can be made to make it choose the lanes in a better manner. But for the purposes of the current assignment, I feel that it is adequate enough.
+
+### Core model for generating paths
+
+For going around the track, we calculate the next five points in the Frenet coordinates. In these, the first two are from the previous calculation, and the next three are points in our target lane, spaced 30 m apart. Once we have these, using the `spline.h` library, a spline is created. With the spline, the next n number of points are calculated (in this case 50) and they are added to the path points. The code ensures that `next_x_vals` and `next_y_vals` always contain a max of 50 points at a given point of time.
+
+In order to stay in the given lane, we try to keep `d` for our path as constant as possible. In order to stay in the center of the lane, we calculate `d` to be `(2 + 4 * lane)` (code lines: 389 - 391). At the same time, the vehicle's max speed is topped off at 49.5 MPH. Till is reaches this hard-coded maximum speed, the acceleration is performed at a rate of 0.224 mps.
+
+When it detects a vehicle in front of it, within the `safety_distance_front` value, it will first try to slow down at a decelaration rate of `0.448`. I felt that slowing down faster, while not exceeding jerk parameter, is more important that speeding up. We use the `sensor_fusion` data that the system receives and calculate the sensed vehicle's possible heading, location on the lane and the speed at which it is traveling in, in Frenet coordinates. Code lines: 283-295.
+
+While this happens, when parsing through the `sensor_fusion` data, the system also tries to see if there is a possibility to switch lanes. It performs the following operations to determine that:
+1. Check if the sensed vehicle is withing the following parameters:
+ * Ahead of `ego` and within 30 meters(`safety_distance_front`); or
+ * Behind `ego` and within 10 meters (`safety_distance_rear`)
+2. If so, check which lane it is in and perform the following:
+ * If same lane, mark too close, ready to switch lanes.
+ * If in immediate left lane, mark left lane not safe
+ * If in immediate right lane, mark right lane not safe.
+3. If it was determined to be too close, check which lane is safe to move to and switch accordingly.
+
+### Working images:
+* Ego able to run more than 4.32 miles:
+![Slows_when_traffic](./data/Slows_when_traffic.png)
+* Ego switching lanes:
+![Change_lanes_001](./data/Change_lanes_001.png)
+
+![Change_lanes_002](./data/Change_lanes_002.png)
+
 
 ## Basic Build Instructions
 
@@ -38,13 +73,13 @@ Here is the data provided from the Simulator to the C++ Program
 #### Previous path data given to the Planner
 
 //Note: Return the previous list but with processed points removed, can be a nice tool to show how far along
-the path has processed since last time. 
+the path has processed since last time.
 
 ["previous_path_x"] The previous list of x points previously given to the simulator
 
 ["previous_path_y"] The previous list of y points previously given to the simulator
 
-#### Previous path's end s and d values 
+#### Previous path's end s and d values
 
 ["end_path_s"] The previous list's last point's frenet s value
 
@@ -52,7 +87,7 @@ the path has processed since last time.
 
 #### Sensor Fusion Data, a list of all other car's attributes on the same side of the road. (No Noise)
 
-["sensor_fusion"] A 2d vector of cars and then that car's [car's unique ID, car's x position in map coordinates, car's y position in map coordinates, car's x velocity in m/s, car's y velocity in m/s, car's s position in frenet coordinates, car's d position in frenet coordinates. 
+["sensor_fusion"] A 2d vector of cars and then that car's [car's unique ID, car's x position in map coordinates, car's y position in map coordinates, car's x velocity in m/s, car's y velocity in m/s, car's s position in frenet coordinates, car's d position in frenet coordinates.
 
 ## Details
 
@@ -82,7 +117,7 @@ A really helpful resource for doing this project and creating smooth trajectorie
   * Run either `install-mac.sh` or `install-ubuntu.sh`.
   * If you install from source, checkout to commit `e94b6e1`, i.e.
     ```
-    git clone https://github.com/uWebSockets/uWebSockets 
+    git clone https://github.com/uWebSockets/uWebSockets
     cd uWebSockets
     git checkout e94b6e1
     ```
@@ -137,4 +172,3 @@ still be compilable with cmake and make./
 
 ## How to write a README
 A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
-
