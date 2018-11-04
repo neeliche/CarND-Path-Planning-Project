@@ -272,6 +272,7 @@ int main() {
                     //TODO: Move these values to a constants file
                     double safety_distance_front = 30; //Borrowing value from video
                     double safety_distance_rear = 10; 
+                    double max_safe_vel = 49.5;
                     
                     if(lane < 2) lane_change_right = true;
                     if(lane > 0) lane_change_left = true;
@@ -292,9 +293,10 @@ int main() {
                         //to check car is in my lane or not
                         float d = sensor_fusion[i][6];
 
+                        cout<<"Cur lane = " << lane<<endl;
                         //Determine if either the car in front is too close or if the one in the back is too close. 
                         if (((car_sense_s > car_s) && (car_sense_s - car_s < safety_distance_front))
-                                or (car_sense_s - car_s < -safety_distance_rear)) {
+                                or (((car_s - car_sense_s) < safety_distance_rear) && (car_s > car_sense_s))) {
                             //too_close = true;
                             
                             if(d < (2+4*lane+2) && d > (2+4*lane-2) && (car_sense_s > car_s)) {
@@ -302,14 +304,28 @@ int main() {
                                 //In the same lane as Ego. 
                                 too_close = true;
                                 
+                                if(car_sense_s > car_s) {
+                                    max_safe_vel = calc_speed;
+                                }
+                                
 //                                if(lane < 2) lane_change_right = true;
 //                                if(lane > 0) lane_change_left = true;
-                            } else if (d > 0 && d < (2+4*lane-2)) {
+                            } else if (d < 2 +(4*lane)-2) {
                                 //Sensed a car close in left lane
                                 lane_change_left = false;
-                            } else if (d > (2+4*lane+2)) {
+                                cout<<"Car Detected to left"<<endl;
+                                cout<<"id = " << sensor_fusion[i][0]<<endl;
+                                cout<<"d = " << sensor_fusion[i][6]<<endl;
+                                cout<<"s diff = " << car_sense_s - car_s <<endl;
+                                cout<<"------------------"<<endl;
+                            } else if (d > 2+(4*lane)+2) {
                                 //Sensed a car close in right lane
                                 lane_change_right = false;
+                                cout<<"Car Detected to right"<<endl;
+                                cout<<"id = " << sensor_fusion[i][0]<<endl;
+                                cout<<"d = " << sensor_fusion[i][6]<<endl;
+                                cout<<"s diff = " << car_sense_s - car_s<<endl;
+                                cout<<"------------------"<<endl;
                             }
                         }
                     }
@@ -317,7 +333,7 @@ int main() {
                     //Crude mechanism right now. Would prefer to figure out a way to pull the vehicle back to c
                     //center lane.
                     if (too_close) {
-                        ref_vel -= 0.224;
+                        ref_vel -= 0.448;
 
                         //Preferring left lane over right to overtake.
                         if (lane_change_left) {
@@ -325,7 +341,7 @@ int main() {
                         } else if (lane_change_right) {
                             lane++;
                         }
-                    } else if (ref_vel < 49.5) {
+                    } else if (ref_vel < max_safe_vel) {
                         ref_vel += 0.224;
                     }
                     
